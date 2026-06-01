@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <title>Polskie Wordle 4×4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #111827;
+            color: #f9fafb;
+            padding-bottom: 190px;
+        }
+
+        body.keyboard-collapsed {
+            padding-bottom: 132px;
+        }
+
+        body.top-panel-pinned {
+            padding-top: var(--top-panel-height, 150px);
+        }
+
+        main {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 12px;
+        }
+
+        .top-panel {
+            max-width: 1500px;
+            margin: 0 auto 10px auto;
+            padding: 10px 12px 8px 12px;
+            background: #111827;
+            z-index: 30;
+            border-radius: 18px;
+        }
+
+        .top-panel.pinned {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            right: auto;
+            width: min(1500px, 100%);
+            transform: translateX(-50%);
+            border-radius: 0 0 18px 18px;
+            border-bottom: 1px solid #374151;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(24px, 3vw, 42px);
+        }
+
+        .subtitle {
+            margin: 4px 0 0 0;
+            color: #d1d5db;
+            font-size: 14px;
+        }
+
+        #message {
+            min-height: 28px;
+            text-align: center;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: #facc15;
+        }
+
+        .top-info {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .progress-strip {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px auto 14px auto;
+        }
+
+        .progress-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #374151;
+            color: #d1d5db;
+            font-size: 13px;
+            font-weight: 900;
+            border: 1px solid #4b5563;
+        }
+
+        .progress-dot.solved {
+            background: #16a34a;
+            border-color: #22c55e;
+            color: white;
+        }
+
+        .progress-dot.failed {
+            background: #991b1b;
+            border-color: #ef4444;
+            color: white;
+        }
+
+        .panel-controls {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 8px 0 2px 0;
+            flex-wrap: wrap;
+        }
+
+        .panel-controls button,
+        .keyboard-toggle {
+            border: 0;
+            padding: 7px 10px;
+            border-radius: 999px;
+            cursor: pointer;
+            background: #374151;
+            color: #f9fafb;
+            font-weight: 800;
+            font-size: 12px;
+        }
+
+        .panel-controls button:hover,
+        .keyboard-toggle:hover {
+            background: #4b5563;
+        }
+
+        .boards {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .boards-section-title {
+            grid-column: 1 / -1;
+            color: #d1d5db;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.3px;
+            margin: 6px 0 -2px 2px;
+        }
+
+        .board {
+            background: #1f2937;
+            border-radius: 12px;
+            padding: 7px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.22);
+            transition: 0.15s ease;
+        }
+
+        .board.active {
+            outline: 3px solid #facc15;
+            box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.16), 0 8px 20px rgba(0,0,0,0.22);
+        }
+
+        .board.solved {
+            outline: 2px solid #22c55e;
+        }
+
+        .board.failed {
+            outline: 2px solid #ef4444;
+        }
+
+        .board.solved.active,
+        .board.failed.active {
+            outline: 3px solid #facc15;
+        }
+
+        .board-title {
+            text-align: center;
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+
+        .board-answer {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            margin-top: 6px;
+            color: #f9fafb;
+        }
+
+        .board-answer.solved-answer {
+            color: #86efac;
+        }
+
+        .board-answer.failed-answer {
+            color: #fca5a5;
+        }
+
+        .grid {
+            display: grid;
+            gap: 3px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+        }
+
+        .cell {
+            aspect-ratio: 1 / 1;
+            border: 1.5px solid #4b5563;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111827;
+            font-weight: 900;
+            font-size: clamp(13px, 1.35vw, 20px);
+            text-transform: uppercase;
+        }
+
+        .cell.filled {
+            border-color: #d1d5db;
+        }
+
+        .cell.hint {
+            border-color: #16a34a;
+            color: #86efac;
+            background: rgba(22, 163, 74, 0.12);
+        }
+
+        .cell.correct {
+            background: #16a34a;
+            border-color: #16a34a;
+            color: white;
+        }
+
+        .cell.present {
+            background: #ca8a04;
+            border-color: #ca8a04;
+            color: white;
+        }
+
+        .cell.absent {
+            background: #374151;
+            border-color: #374151;
+            color: white;
+        }
+
+        #current-guess {
+            min-height: 30px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 5px;
+            margin-bottom: 10px;
+        }
+
+        .keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: center;
+            user-select: none;
+            padding: 8px 8px 12px 8px;
+            background: rgba(17, 24, 39, 0.96);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid #374151;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 20;
+            box-shadow: 0 -10px 24px rgba(0,0,0,0.22);
+        }
+
+        .keyboard.collapsed {
+            padding: 6px 6px 8px 6px;
+            gap: 3px;
+        }
+
+        .keyboard.collapsed .keyboard-header {
+            gap: 6px;
+        }
+
+        .keyboard.collapsed .keyboard-mode {
+            font-size: 10px;
+            margin-bottom: 0;
+        }
+
+        .keyboard.collapsed .keyboard-toggle {
+            padding: 5px 8px;
+            font-size: 10px;
+        }
+
+        .keyboard.collapsed .keyboard-row {
+            display: flex;
+            gap: 3px;
+        }
+
+        .keyboard.collapsed .key {
+            min-width: 25px;
+            padding: 5px 6px;
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .keyboard.collapsed .key.special {
+            min-width: 42px;
+            font-size: 10px;
+        }
+
+        .keyboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .keyboard-mode {
+            color: #d1d5db;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            margin-bottom: 2px;
+        }
+
+        .keyboard-mode strong {
+            color: #f9fafb;
+        }
+
+        .keyboard-row {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .key {
+            border: none;
+            border-radius: 7px;
+            padding: 9px 10px;
+            min-width: 34px;
+            background: #374151;
+            color: #f9fafb;
+            font-size: 14px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .key:hover {
+            background: #4b5563;
+        }
+
+        .key.special {
+            min-width: 68px;
+            background: #6b7280;
+        }
+
+        .key.correct {
+            background: #16a34a;
+        }
+
+        .key.present {
+            background: #ca8a04;
+        }
+
+        .key.absent {
+            background: #1f2937;
+            color: #6b7280;
+        }
+
+
+        .mode-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0 6px;
+            flex-wrap: wrap;
+        }
+
+        .mode-tabs button {
+            border: 0;
+            padding: 9px 13px;
+            border-radius: 999px;
+            cursor: pointer;
+            background: #e5e7eb;
+            color: #111827;
+            font-weight: 900;
+        }
+
+        .mode-tabs button.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        .result-panel {
+            display: none;
+            max-width: 520px;
+            margin: 12px auto 10px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 14px;
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+            text-align: center;
+        }
+
+        .result-panel.visible {
+            display: block;
+        }
+
+        .result-panel h2 {
+            margin: 0 0 6px;
+            font-size: 20px;
+        }
+
+        .result-panel p {
+            margin: 0 0 10px;
+            color: #4b5563;
+            font-weight: 700;
+        }
+
+        .share-preview {
+            white-space: pre-wrap;
+            text-align: left;
+            display: inline-block;
+            margin: 8px auto 12px;
+            background: #f3f4f6;
+            color: #111827;
+            border-radius: 12px;
+            padding: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            line-height: 1.55;
+        }
+
+        .result-actions {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .result-actions button {
+            border: 0;
+            padding: 9px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            font-weight: 900;
+        }
+
+        .result-actions button.secondary {
+            background: #4b5563;
+        }
+
+        .debug {
+            margin-top: 10px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .debug button {
+            margin: 4px;
+            border: 0;
+            padding: 7px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #4b5563;
+            color: white;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .debug button:hover {
+            background: #6b7280;
+        }
+
+        @media (max-width: 1000px) {
+            .boards {
+                grid-template-columns: repeat(2, minmax(130px, 1fr));
+            }
+        }
+
+        @media (max-width: 560px) {
+            main {
+                padding: 8px;
+            }
+
+            .boards {
+                grid-template-columns: repeat(2, minmax(120px, 1fr));
+                gap: 8px;
+            }
+
+            .board {
+                padding: 6px;
+            }
+
+            .key {
+                min-width: 30px;
+                padding: 8px 7px;
+                font-size: 13px;
+            }
+
+            .key.special {
+                min-width: 58px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<main>
+    <header>
+        <h1>Polskie Wordle 4×4</h1>
+        <p class="subtitle">16 słów, jedno zgadywanie, 20 prób.</p>
+        <section class="mode-tabs">
+            <button id="daily-mode-button" type="button" class="active" onclick="startDailyMode()">Daily</button>
+            <button id="practice-mode-button" type="button" onclick="startPracticeMode()">Practice</button>
+        </section>
+    </header>
+
+    <section id="top-panel" class="top-panel">
+        <section id="message"></section>
+        <section id="top-info" class="top-info"></section>
+        <section id="progress-strip" class="progress-strip"></section>
+        <section class="panel-controls">
+            <button id="toggle-top-panel" type="button" onclick="toggleTopPanelMode()">Przypnij panel wyniku</button>
+        </section>
+    </section>
+
+    <section id="result-panel" class="result-panel"></section>
+    <section id="boards" class="boards"></section>
+    <section id="current-guess"></section>
+    <section id="keyboard" class="keyboard"></section>
+
+    <section class="debug">
+        <button onclick="shareResult()">Udostępnij wynik</button>
+    </section>
+</main>
+
+<script>
+    const WORD_LENGTH = 5;
+    const BOARD_COUNT = 16;
+    const MAX_ATTEMPTS = 20;
+
+    /*
+        1 = pokazuje tylko wykonane próby + aktualny rząd.
+        2 = wykonane próby + aktualny rząd + jeden pusty rząd.
+    */
+    const EXTRA_EMPTY_ROWS_VISIBLE = 1;
+
+    const STORAGE_DAILY_PROGRESS = "polskie_wordle_4x4_daily_progress";
+    const STORAGE_UI_SETTINGS = "polskie_wordle_4x4_ui_settings";
+    const MODE_DAILY = "daily";
+    const MODE_PRACTICE = "practice";
+
+    const BOARDS_CONTAINER = document.getElementById("boards");
+    const KEYBOARD_CONTAINER = document.getElementById("keyboard");
+    const MESSAGE = document.getElementById("message");
+    const CURRENT_GUESS = document.getElementById("current-guess");
+    const TOP_INFO = document.getElementById("top-info");
+    const PROGRESS_STRIP = document.getElementById("progress-strip");
+    const TOP_PANEL = document.getElementById("top-panel");
+    const TOGGLE_TOP_PANEL_BUTTON = document.getElementById("toggle-top-panel");
+    const RESULT_PANEL = document.getElementById("result-panel");
+    const DAILY_MODE_BUTTON = document.getElementById("daily-mode-button");
+    const PRACTICE_MODE_BUTTON = document.getElementById("practice-mode-button");
+
+    const POLISH_LETTERS = [
+        "a", "ą", "b", "c", "ć", "d", "e", "ę", "f", "g",
+        "h", "i", "j", "k", "l", "ł", "m", "n", "ń", "o",
+        "ó", "p", "q", "r", "s", "ś", "t", "u", "v", "w",
+        "x", "y", "z", "ź", "ż"
+    ];
+
+    const KEYBOARD_ROWS = [
+        ["ą", "ć", "ę", "ł", "ń", "ó", "ś", "ź", "ż"],
+        ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+        ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+        ["enter", "z", "x", "c", "v", "b", "n", "m", "backspace"]
+    ];
+
+    let puzzleDate = "";
+    let dailyWords = [];
+    let currentGuess = "";
+    let attempts = [];
+    let boardStates = [];
+    let keyStatuses = new Map();
+    let activeBoardIndex = 0;
+    let gameOver = false;
+    let allAllowedWords = new Set();
+    let allAnswerWords = [];
+    let keyboardCollapsed = false;
+    let topPanelPinned = false;
+    let gameMode = MODE_DAILY;
+    let endScreenShown = false;
+
+    async function loadWordFile(filename, label) {
+        const response = await fetch(filename, { cache: "no-store" });
+
+        if (!response.ok) {
+            throw new Error(`Nie udało się pobrać ${label}. Sprawdź, czy plik leży obok index.html.`);
+        }
+
+        const text = await response.text();
+
+        const words = text
+            .split(/\r?\n/)
+            .map(normalizeWord)
+            .filter(word => [...word].length === WORD_LENGTH)
+            .filter(word => /^[a-ząćęłńóśźż]+$/iu.test(word));
+
+        return [...new Set(words)];
+    }
+
+    async function loadAllWords() {
+        const allowedWords = await loadWordFile("words5.txt", "words5.txt");
+        const answerWords = await loadWordFile("answers5.txt", "answers5.txt");
+
+        allAllowedWords = new Set([...allowedWords, ...answerWords]);
+        allAnswerWords = answerWords;
+
+        return { allowedWords, answerWords };
+    }
+
+    function getDateKey() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+
+    function hashStringToNumber(text) {
+        let hash = 2166136261;
+
+        for (let i = 0; i < text.length; i++) {
+            hash ^= text.charCodeAt(i);
+            hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+        }
+
+        return hash >>> 0;
+    }
+
+    function seededRandom(seed) {
+        let value = seed >>> 0;
+
+        return function () {
+            value += 0x6D2B79F5;
+
+            let t = value;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function pickDailyWords(allWords, dateKey) {
+        const seed = hashStringToNumber(dateKey);
+        const random = seededRandom(seed);
+        const shuffled = [...allWords];
+
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        return shuffled.slice(0, BOARD_COUNT);
+    }
+
+    function pickPracticeWords(allWords) {
+        const shuffled = [...allWords];
+
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        return shuffled.slice(0, BOARD_COUNT);
+    }
+
+    init();
+
+    async function init() {
+        try {
+            const { answerWords } = await loadAllWords();
+
+            if (answerWords.length < BOARD_COUNT) {
+                throw new Error(`Za mało słów w answers5.txt. Potrzeba ${BOARD_COUNT}, jest ${answerWords.length}.`);
+            }
+
+            loadUiSettings();
+            applyUiSettings();
+            startDailyMode();
+
+            window.addEventListener("keydown", handlePhysicalKeyboard);
+            window.addEventListener("resize", applyUiSettings);
+        } catch (err) {
+            console.error(err);
+            showMessage(err.message);
+        }
+    }
+
+    function startDailyMode() {
+        gameMode = MODE_DAILY;
+        endScreenShown = false;
+        puzzleDate = getDateKey();
+        dailyWords = pickDailyWords(allAnswerWords, puzzleDate);
+
+        const savedProgress = loadDailyProgress(puzzleDate, dailyWords);
+
+        if (savedProgress) {
+            attempts = savedProgress.attempts || [];
+            boardStates = normalizeBoardStates(savedProgress.boardStates || createEmptyBoardStates());
+            keyStatuses = new Map(savedProgress.keyStatuses || []);
+            activeBoardIndex = clampBoardIndex(savedProgress.activeBoardIndex);
+            gameOver = Boolean(savedProgress.gameOver);
+        } else {
+            attempts = [];
+            boardStates = createEmptyBoardStates();
+            keyStatuses = new Map();
+            activeBoardIndex = 0;
+            gameOver = false;
+            saveDailyProgress();
+        }
+
+        updateModeButtons();
+        hideResultPanel();
+        updateTopInfo();
+        renderBoards();
+        renderKeyboard();
+        updateCurrentGuess();
+
+        if (gameOver) {
+            showEndScreen();
+        }
+    }
+
+    function startPracticeMode() {
+        gameMode = MODE_PRACTICE;
+        endScreenShown = false;
+        puzzleDate = "practice";
+        dailyWords = pickPracticeWords(allAnswerWords);
+        attempts = [];
+        boardStates = createEmptyBoardStates();
+        keyStatuses = new Map();
+        activeBoardIndex = 0;
+        gameOver = false;
+        currentGuess = "";
+
+        updateModeButtons();
+        hideResultPanel();
+        updateTopInfo();
+        renderBoards();
+        renderKeyboard();
+        updateCurrentGuess();
+        showMessage("Tryb practice: losowy zestaw, bez zapisu i bez udostępniania wyniku.");
+    }
+
+    function updateModeButtons() {
+        DAILY_MODE_BUTTON.classList.toggle("active", gameMode === MODE_DAILY);
+        PRACTICE_MODE_BUTTON.classList.toggle("active", gameMode === MODE_PRACTICE);
+    }
+
+
+    function loadUiSettings() {
+        try {
+            const raw = localStorage.getItem(STORAGE_UI_SETTINGS);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            keyboardCollapsed = Boolean(parsed.keyboardCollapsed);
+            topPanelPinned = Boolean(parsed.topPanelPinned);
+        } catch {
+            keyboardCollapsed = false;
+            topPanelPinned = false;
+        }
+    }
+
+    function saveUiSettings() {
+        localStorage.setItem(STORAGE_UI_SETTINGS, JSON.stringify({
+            keyboardCollapsed,
+            topPanelPinned
+        }));
+    }
+
+    function applyUiSettings() {
+        document.body.classList.toggle("keyboard-collapsed", keyboardCollapsed);
+        KEYBOARD_CONTAINER.classList.toggle("collapsed", keyboardCollapsed);
+        TOP_PANEL.classList.toggle("pinned", topPanelPinned);
+        document.body.classList.toggle("top-panel-pinned", topPanelPinned);
+
+        if (TOGGLE_TOP_PANEL_BUTTON) {
+            TOGGLE_TOP_PANEL_BUTTON.textContent = topPanelPinned
+                ? "Odepnij panel wyniku"
+                : "Przypnij panel wyniku";
+        }
+
+        if (topPanelPinned) {
+            requestAnimationFrame(() => {
+                document.body.style.setProperty("--top-panel-height", `${TOP_PANEL.offsetHeight}px`);
+            });
+        } else {
+            document.body.style.removeProperty("--top-panel-height");
+        }
+    }
+
+    function toggleKeyboardCollapsed() {
+        keyboardCollapsed = !keyboardCollapsed;
+        saveUiSettings();
+        applyUiSettings();
+        renderKeyboard();
+    }
+
+    function toggleTopPanelMode() {
+        topPanelPinned = !topPanelPinned;
+        saveUiSettings();
+        applyUiSettings();
+    }
+
+    function normalizeWord(value) {
+        return String(value || "")
+            .trim()
+            .toLocaleLowerCase("pl-PL")
+            .normalize("NFC");
+    }
+
+    function createEmptyBoardStates() {
+        return dailyWords.map(() => ({
+            solved: false,
+            failed: false,
+            solvedAt: null
+        }));
+    }
+
+    function normalizeBoardStates(states) {
+        const normalized = createEmptyBoardStates();
+
+        dailyWords.forEach((word, index) => {
+            const incoming = states[index] || {};
+            normalized[index].solved = Boolean(incoming.solved);
+            normalized[index].failed = Boolean(incoming.failed);
+            normalized[index].solvedAt = Number.isInteger(incoming.solvedAt) ? incoming.solvedAt : null;
+
+            if (normalized[index].solved && normalized[index].solvedAt === null) {
+                const solvedAttempt = attempts.findIndex(attempt => normalizeWord(attempt) === normalizeWord(word));
+                normalized[index].solvedAt = solvedAttempt >= 0 ? solvedAttempt : Math.max(0, attempts.length - 1);
+            }
+        });
+
+        return normalized;
+    }
+
+    function loadDailyProgress(date, words) {
+        try {
+            const raw = localStorage.getItem(STORAGE_DAILY_PROGRESS);
+            if (!raw) return null;
+
+            const parsed = JSON.parse(raw);
+
+            if (parsed.date !== date) return null;
+            if (!Array.isArray(parsed.dailyWords)) return null;
+
+            const savedWords = parsed.dailyWords.map(normalizeWord).join("|");
+            const currentWords = words.map(normalizeWord).join("|");
+
+            if (savedWords !== currentWords) return null;
+
+            return parsed;
+        } catch {
+            return null;
+        }
+    }
+
+    function saveDailyProgress() {
+        if (gameMode !== MODE_DAILY) return;
+
+        const state = {
+            date: puzzleDate,
+            dailyWords,
+            attempts,
+            boardStates,
+            gameOver,
+            keyStatuses: [...keyStatuses.entries()],
+            activeBoardIndex
+        };
+
+        localStorage.setItem(STORAGE_DAILY_PROGRESS, JSON.stringify(state));
+    }
+
+    function updateTopInfo() {
+        const nextAttempt = Math.min(attempts.length + 1, MAX_ATTEMPTS);
+        const solvedCount = boardStates.filter(state => state.solved).length;
+
+        const label = gameMode === MODE_PRACTICE ? "Practice" : `Daily: ${puzzleDate}`;
+
+        if (gameOver) {
+            TOP_INFO.textContent = `${label} · Rozwiązane: ${solvedCount}/${BOARD_COUNT} · Gra zakończona`;
+        } else {
+            TOP_INFO.textContent = `${label} · Próba ${nextAttempt}/${MAX_ATTEMPTS} · Rozwiązane: ${solvedCount}/${BOARD_COUNT}`;
+        }
+
+        renderProgressStrip();
+    }
+
+    function renderProgressStrip() {
+        PROGRESS_STRIP.innerHTML = "";
+
+        boardStates.forEach((state, index) => {
+            const marker = document.createElement("span");
+            marker.className = "progress-dot";
+            marker.textContent = String(index + 1);
+
+            if (state.solved) marker.classList.add("solved");
+            if (state.failed) marker.classList.add("failed");
+
+            marker.title = state.solved
+                ? `Plansza ${index + 1}: rozwiązana — ${dailyWords[index].toLocaleUpperCase("pl-PL")}`
+                : state.failed
+                    ? `Plansza ${index + 1}: przegrana — ${dailyWords[index].toLocaleUpperCase("pl-PL")}`
+                    : `Plansza ${index + 1}: nierozwiązana`;
+
+            marker.addEventListener("click", () => selectBoard(index));
+            PROGRESS_STRIP.appendChild(marker);
+        });
+    }
+
+    function showMessage(text) {
+        MESSAGE.textContent = text;
+
+        if (text) {
+            setTimeout(() => {
+                if (MESSAGE.textContent === text) {
+                    MESSAGE.textContent = "";
+                }
+            }, 2600);
+        }
+    }
+
+    function getVisibleRowsCount() {
+        const base = attempts.length + EXTRA_EMPTY_ROWS_VISIBLE;
+        return Math.min(MAX_ATTEMPTS, Math.max(1, base));
+    }
+
+    function renderBoards() {
+        BOARDS_CONTAINER.innerHTML = "";
+
+        const solvedIndexes = [];
+        const activeIndexes = [];
+
+        dailyWords.forEach((_, index) => {
+            const state = boardStates[index] || {};
+            if (state.solved) solvedIndexes.push(index);
+            else activeIndexes.push(index);
+        });
+
+        const orderedIndexes = [...solvedIndexes, ...activeIndexes];
+
+        orderedIndexes.forEach((boardIndex, visualIndex) => {
+            const word = dailyWords[boardIndex];
+            const state = boardStates[boardIndex] || {};
+
+            if (solvedIndexes.length > 0 && visualIndex === 0) {
+                const title = document.createElement("div");
+                title.className = "boards-section-title";
+                title.textContent = "Rozwiązane";
+                BOARDS_CONTAINER.appendChild(title);
+            }
+
+            if (activeIndexes.length > 0 && visualIndex === solvedIndexes.length) {
+                const title = document.createElement("div");
+                title.className = "boards-section-title";
+                title.textContent = "Do rozwiązania";
+                BOARDS_CONTAINER.appendChild(title);
+            }
+
+            const board = document.createElement("article");
+            board.className = "board";
+
+            if (state.solved) {
+                board.classList.add("solved");
+            }
+
+            if (state.failed) {
+                board.classList.add("failed");
+            }
+
+            if (activeBoardIndex !== null && boardIndex === activeBoardIndex) {
+                board.classList.add("active");
+            }
+
+            board.addEventListener("click", () => selectBoard(boardIndex));
+
+            const title = document.createElement("div");
+            title.className = "board-title";
+
+            if (state.solved) {
+                title.textContent = `${boardIndex + 1} — rozwiązane`;
+            } else if (state.failed) {
+                title.textContent = `${boardIndex + 1} — przegrane`;
+            } else {
+                title.textContent = `Słowo ${boardIndex + 1}`;
+            }
+
+            const grid = document.createElement("div");
+            grid.className = "grid";
+
+            const visibleAttempts = getVisibleAttemptsForBoard(boardIndex);
+            const visibleRows = getVisibleRowsCountForBoard(boardIndex, visibleAttempts.length);
+            const knownCorrectLetters = getKnownCorrectLetters(boardIndex);
+
+            for (let rowIndex = 0; rowIndex < visibleRows; rowIndex++) {
+                const row = document.createElement("div");
+                row.className = "row";
+
+                const attempt = visibleAttempts[rowIndex];
+                let evaluation = null;
+
+                if (attempt) {
+                    evaluation = evaluateGuess(attempt, word);
+                }
+
+                for (let colIndex = 0; colIndex < WORD_LENGTH; colIndex++) {
+                    const cell = document.createElement("div");
+                    cell.className = "cell";
+
+                    if (attempt) {
+                        cell.textContent = [...attempt][colIndex].toLocaleUpperCase("pl-PL");
+                        cell.classList.add(evaluation[colIndex]);
+                    } else if (!state.solved && !state.failed && !gameOver) {
+                        const typedLetter = [...currentGuess][colIndex];
+                        const hintedLetter = knownCorrectLetters[colIndex];
+
+                        if (typedLetter) {
+                            cell.textContent = typedLetter.toLocaleUpperCase("pl-PL");
+                            cell.classList.add("filled");
+                        } else if (hintedLetter) {
+                            cell.textContent = hintedLetter.toLocaleUpperCase("pl-PL");
+                            cell.classList.add("hint");
+                        }
+                    }
+
+                    row.appendChild(cell);
+                }
+
+                grid.appendChild(row);
+            }
+
+            board.appendChild(title);
+            board.appendChild(grid);
+
+            if (state.solved || state.failed || gameOver) {
+                const answer = document.createElement("div");
+                answer.className = "board-answer";
+                answer.classList.add(state.solved ? "solved-answer" : "failed-answer");
+                answer.textContent = word.toLocaleUpperCase("pl-PL");
+                board.appendChild(answer);
+            }
+
+            BOARDS_CONTAINER.appendChild(board);
+        });
+    }
+
+    function getVisibleAttemptsForBoard(boardIndex) {
+        const state = boardStates[boardIndex] || {};
+
+        if (state.solved && Number.isInteger(state.solvedAt)) {
+            return attempts.slice(0, state.solvedAt + 1);
+        }
+
+        return attempts;
+    }
+
+    function getVisibleRowsCountForBoard(boardIndex, visibleAttemptsCount) {
+        const state = boardStates[boardIndex] || {};
+
+        if (state.solved || state.failed || gameOver) {
+            return Math.max(1, visibleAttemptsCount);
+        }
+
+        const base = visibleAttemptsCount + EXTRA_EMPTY_ROWS_VISIBLE;
+        return Math.min(MAX_ATTEMPTS, Math.max(1, base));
+    }
+
+    function getKnownCorrectLetters(boardIndex) {
+        const target = dailyWords[boardIndex];
+        const visibleAttempts = getVisibleAttemptsForBoard(boardIndex);
+        const known = Array(WORD_LENGTH).fill("");
+
+        for (const attempt of visibleAttempts) {
+            const evaluation = evaluateGuess(attempt, target);
+            const letters = [...attempt];
+
+            evaluation.forEach((status, index) => {
+                if (status === "correct") {
+                    known[index] = letters[index];
+                }
+            });
+        }
+
+        return known;
+    }
+
+    function evaluateGuess(guess, target) {
+        const result = Array(WORD_LENGTH).fill("absent");
+
+        const targetLetters = [...target];
+        const guessLetters = [...guess];
+
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            if (guessLetters[i] === targetLetters[i]) {
+                result[i] = "correct";
+                targetLetters[i] = null;
+                guessLetters[i] = null;
+            }
+        }
+
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            if (guessLetters[i] === null) continue;
+
+            const foundIndex = targetLetters.indexOf(guessLetters[i]);
+
+            if (foundIndex !== -1) {
+                result[i] = "present";
+                targetLetters[foundIndex] = null;
+            }
+        }
+
+        return result;
+    }
+
+    function clampBoardIndex(value) {
+        if (value === null || value === "global") return null;
+
+        const index = Number(value);
+        if (!Number.isInteger(index)) return 0;
+        return Math.min(BOARD_COUNT - 1, Math.max(0, index));
+    }
+
+    function selectBoard(index) {
+        const clickedIndex = clampBoardIndex(index);
+        activeBoardIndex = activeBoardIndex === clickedIndex ? null : clickedIndex;
+        saveDailyProgress();
+        renderBoards();
+        renderKeyboard();
+    }
+
+    function getKeyboardStatusesForBoard(boardIndex) {
+        const statuses = new Map();
+        const target = dailyWords[boardIndex];
+        const visibleAttempts = getVisibleAttemptsForBoard(boardIndex);
+
+        for (const attempt of visibleAttempts) {
+            const evaluation = evaluateGuess(attempt, target);
+            const letters = [...attempt];
+
+            letters.forEach((letter, index) => {
+                const newStatus = evaluation[index];
+                const oldStatus = statuses.get(letter);
+                statuses.set(letter, strongerStatus(oldStatus, newStatus));
+            });
+        }
+
+        return statuses;
+    }
+
+    function getGlobalKeyboardStatuses() {
+        const statuses = new Map();
+
+        dailyWords.forEach((_, boardIndex) => {
+            const boardStatuses = getKeyboardStatusesForBoard(boardIndex);
+
+            boardStatuses.forEach((status, letter) => {
+                const oldStatus = statuses.get(letter);
+                statuses.set(letter, strongerStatus(oldStatus, status));
+            });
+        });
+
+        return statuses;
+    }
+
+    function renderKeyboard() {
+        KEYBOARD_CONTAINER.innerHTML = "";
+
+        const boardKeyStatuses = activeBoardIndex === null
+            ? getGlobalKeyboardStatuses()
+            : getKeyboardStatusesForBoard(activeBoardIndex);
+
+        KEYBOARD_CONTAINER.classList.toggle("collapsed", keyboardCollapsed);
+
+        const header = document.createElement("div");
+        header.className = "keyboard-header";
+
+        const mode = document.createElement("div");
+        mode.className = "keyboard-mode";
+        mode.innerHTML = activeBoardIndex === null
+            ? "Klawiatura: <strong>globalna</strong>"
+            : `Klawiatura: <strong>plansza ${activeBoardIndex + 1}</strong> · kliknij ją ponownie, żeby zobaczyć globalną`;
+
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "keyboard-toggle";
+        toggle.textContent = keyboardCollapsed ? "Rozwiń klawiaturę" : "Zwiń klawiaturę";
+        toggle.addEventListener("click", toggleKeyboardCollapsed);
+
+        header.appendChild(mode);
+        header.appendChild(toggle);
+        KEYBOARD_CONTAINER.appendChild(header);
+
+        for (const row of KEYBOARD_ROWS) {
+            const rowElement = document.createElement("div");
+            rowElement.className = "keyboard-row";
+
+            for (const key of row) {
+                const button = document.createElement("button");
+                button.className = "key";
+
+                if (key === "enter" || key === "backspace") {
+                    button.classList.add("special");
+                }
+
+                if (boardKeyStatuses.has(key)) {
+                    button.classList.add(boardKeyStatuses.get(key));
+                }
+
+                button.textContent = keyLabel(key);
+                button.addEventListener("click", () => handleKey(key));
+
+                rowElement.appendChild(button);
+            }
+
+            KEYBOARD_CONTAINER.appendChild(rowElement);
+        }
+    }
+
+    function keyLabel(key) {
+        if (key === "enter") return "ENTER";
+        if (key === "backspace") return "⌫";
+        return key.toLocaleUpperCase("pl-PL");
+    }
+
+    function handlePhysicalKeyboard(event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+        const key = normalizeWord(event.key);
+
+        if (key === "enter") {
+            handleKey("enter");
+            return;
+        }
+
+        if (key === "backspace") {
+            handleKey("backspace");
+            return;
+        }
+
+        if (POLISH_LETTERS.includes(key)) {
+            handleKey(key);
+        }
+    }
+
+    function handleKey(key) {
+        if (gameOver) return;
+
+        if (key === "enter") {
+            submitGuess();
+            return;
+        }
+
+        if (key === "backspace") {
+            currentGuess = [...currentGuess].slice(0, -1).join("");
+            updateCurrentGuess();
+            renderBoards();
+            return;
+        }
+
+        if ([...currentGuess].length >= WORD_LENGTH) return;
+
+        currentGuess += key;
+        updateCurrentGuess();
+        renderBoards();
+    }
+
+    function updateCurrentGuess() {
+        CURRENT_GUESS.textContent = currentGuess.toLocaleUpperCase("pl-PL");
+    }
+
+    async function submitGuess() {
+        const guess = normalizeWord(currentGuess);
+
+        if ([...guess].length !== WORD_LENGTH) {
+            showMessage(`Słowo musi mieć ${WORD_LENGTH} liter.`);
+            return;
+        }
+
+        const valid = await validateGuess(guess);
+
+        if (!valid) {
+            showMessage("Tego słowa nie ma w słowniku.");
+            return;
+        }
+
+        attempts.push(guess);
+
+        dailyWords.forEach((word, index) => {
+            if (!boardStates[index].solved && guess === word) {
+                boardStates[index].solved = true;
+                boardStates[index].solvedAt = attempts.length - 1;
+            }
+        });
+
+        updateKeyboardStatuses(guess);
+
+        currentGuess = "";
+        updateCurrentGuess();
+
+        if (boardStates.every(state => state.solved)) {
+            gameOver = true;
+            showMessage("Brawo! Wszystkie słowa rozwiązane.");
+        } else if (attempts.length >= MAX_ATTEMPTS) {
+            gameOver = true;
+
+            boardStates.forEach((state) => {
+                if (!state.solved) {
+                    state.failed = true;
+                }
+            });
+
+            showMessage("Koniec prób. Nie wszystkie słowa zostały rozwiązane.");
+        }
+
+        updateTopInfo();
+        saveDailyProgress();
+        renderBoards();
+        renderKeyboard();
+
+        if (gameOver) {
+            showEndScreen();
+        }
+    }
+
+    async function validateGuess(guess) {
+        return allAllowedWords.has(normalizeWord(guess));
+    }
+
+    function updateKeyboardStatuses(guess) {
+        for (const word of dailyWords) {
+            const evaluation = evaluateGuess(guess, word);
+            const guessLetters = [...guess];
+
+            guessLetters.forEach((letter, index) => {
+                const newStatus = evaluation[index];
+                const oldStatus = keyStatuses.get(letter);
+
+                keyStatuses.set(letter, strongerStatus(oldStatus, newStatus));
+            });
+        }
+    }
+
+    function strongerStatus(oldStatus, newStatus) {
+        const priority = {
+            absent: 1,
+            present: 2,
+            correct: 3
+        };
+
+        if (!oldStatus) return newStatus;
+
+        return priority[newStatus] > priority[oldStatus]
+            ? newStatus
+            : oldStatus;
+    }
+
+    function digitToKeycap(digit) {
+        const map = {
+            "0": "0️⃣",
+            "1": "1️⃣",
+            "2": "2️⃣",
+            "3": "3️⃣",
+            "4": "4️⃣",
+            "5": "5️⃣",
+            "6": "6️⃣",
+            "7": "7️⃣",
+            "8": "8️⃣",
+            "9": "9️⃣"
+        };
+
+        return map[digit] || digit;
+    }
+
+    function twoDigitEmoji(value) {
+        return String(value)
+            .padStart(2, "0")
+            .split("")
+            .map(digitToKeycap)
+            .join("");
+    }
+
+    function getPuzzleNumber() {
+        const firstPuzzle = new Date("2026-06-01T00:00:00");
+        const currentPuzzle = new Date(`${puzzleDate}T00:00:00`);
+        const oneDay = 24 * 60 * 60 * 1000;
+        const diff = Math.floor((currentPuzzle - firstPuzzle) / oneDay);
+
+        return Math.max(1, diff + 1);
+    }
+
+    function boardShareToken(state) {
+        if (state.solved) {
+            return twoDigitEmoji(state.solvedAt + 1);
+        }
+
+        if (gameOver || state.failed) {
+            return "❌❌";
+        }
+
+        return "⬜⬜";
+    }
+
+    function buildShareText() {
+        const puzzleNumber = getPuzzleNumber();
+        const rows = [];
+
+        for (let row = 0; row < 4; row++) {
+            const cells = [];
+
+            for (let col = 0; col < 4; col++) {
+                const index = row * 4 + col;
+                cells.push(boardShareToken(boardStates[index] || {}));
+            }
+
+            rows.push(cells.join(" "));
+        }
+
+        return [
+            `Daily wordle #${puzzleNumber}`,
+            `Guesses: ${attempts.length}/${MAX_ATTEMPTS}`,
+            rows.join("\n"),
+            "https://astroksiezyc.pl/wordle"
+        ].join("\n");
+    }
+
+    function hideResultPanel() {
+        RESULT_PANEL.classList.remove("visible");
+        RESULT_PANEL.innerHTML = "";
+    }
+
+    function buildResultPreview() {
+        return buildShareText();
+    }
+
+    function showEndScreen() {
+        if (endScreenShown) return;
+        endScreenShown = true;
+
+        const solvedCount = boardStates.filter(state => state.solved).length;
+        const won = solvedCount === BOARD_COUNT;
+        const title = won ? "Wygrana!" : "Koniec gry";
+        const description = won
+            ? `Rozwiązano wszystkie ${BOARD_COUNT} plansz w ${attempts.length}/${MAX_ATTEMPTS} próbach.`
+            : `Rozwiązano ${solvedCount}/${BOARD_COUNT} plansz. Wykorzystano ${attempts.length}/${MAX_ATTEMPTS} prób.`;
+
+        const preview = gameMode === MODE_DAILY
+            ? buildResultPreview()
+            : buildPracticePreview();
+
+        RESULT_PANEL.innerHTML = `
+            <h2>${title}</h2>
+            <p>${description}</p>
+            <div class="share-preview">${escapeHtml(preview)}</div>
+            <div class="result-actions">
+                ${gameMode === MODE_DAILY ? '<button type="button" onclick="shareResult()">Skopiuj wynik</button>' : ''}
+                <button type="button" class="secondary" onclick="startPracticeMode()">Nowy practice</button>
+            </div>
+        `;
+        RESULT_PANEL.classList.add("visible");
+        RESULT_PANEL.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function buildPracticePreview() {
+        const rows = [];
+
+        for (let row = 0; row < 4; row++) {
+            const cells = [];
+
+            for (let col = 0; col < 4; col++) {
+                const index = row * 4 + col;
+                cells.push(boardShareToken(boardStates[index] || {}));
+            }
+
+            rows.push(cells.join(" "));
+        }
+
+        return [
+            "Practice wordle",
+            `Guesses: ${attempts.length}/${MAX_ATTEMPTS}`,
+            rows.join("\n")
+        ].join("\n");
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    async function shareResult() {
+        if (gameMode === MODE_PRACTICE) {
+            showMessage("W trybie practice nie można kopiować wyniku.");
+            return;
+        }
+
+        const text = buildShareText();
+
+        try {
+            await navigator.clipboard.writeText(text);
+            showMessage("Wynik skopiowany do schowka.");
+        } catch (err) {
+            console.warn(err);
+            prompt("Skopiuj wynik:", text);
+        }
+    }
+
+    function revealWords() {
+        alert(dailyWords.join(", "));
+        console.log("Dzisiejsze słowa:", dailyWords);
+    }
+
+    function resetLocalGame() {
+        if (gameMode === MODE_PRACTICE) {
+            startPracticeMode();
+            return;
+        }
+
+        if (!confirm("Zresetować lokalny postęp dzisiejszej gry? Słowa dnia zostaną te same.")) {
+            return;
+        }
+
+        localStorage.removeItem(STORAGE_DAILY_PROGRESS);
+        startDailyMode();
+    }
+</script>
+</body>
+</html>
